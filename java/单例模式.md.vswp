@@ -1,0 +1,146 @@
+vnote_backup_file_826537664 E:/note/java模式/单例模式.md
+# 单例模式
+
+&nbsp;
+## 简介
+
+&emsp;&emsp;* 单例模式的对象只允许有一个实例，而且该实例面向整个系统。对于系统中具有唯一性的资源进行统一分配管理。可以看成一种资源管理器。
+
+&emsp;&emsp;* 对于系统中的某些类来说，只有一个实例很重要，例如，一个系统中可以存在多个打印任务，但是只能有一个正在工作的任务；一个系统只能有一个窗口管理器或文件系统；一个系统只能有一个计时工具或ID(序号)生成器。如在Windows中就只能打开一个任务管理器。如果不使用机制对窗口对象进行唯一化，将弹出多个窗口，如果这些窗口显示的内容完全一致，则是重复对象，浪费内存资源；如果这些窗口显示的内容不一致，则意味着在某一瞬间系统有多个状态，与实际不符，也会给用户带来误解，不知道哪一个才是真实的状态。因此有时确保系统中某个对象的唯一性即一个类只能有一个实例非常重要。
+
+&nbsp;
+## 基本实现思路
+
+&emsp;&emsp;单例模式要求类只能返回同一个引用(整个系统中唯一)和获取这个类引用的公有的静态方法(通常使用getInstance这个名称)
+
+&nbsp;
+## 优点
+
+&emsp;&emsp;系统内存中该类只存在一个对象，节省了系统资源，对于一些需要频繁创建销毁的对象，使用单例模式可以提高系统性能。
+
+&nbsp;
+## 缺陷
+
+&emsp;&emsp;1. 滥用单例将带来一些负面的问题，如为了节省资源将数据库连接池对象设计为单例模式，可能会导致共享连接池对象的程序过多未出而出现的连接池溢出。  
+&emsp;&emsp;2. 如果实例化对象长时间不用系统就会被认为垃圾对象被回收，这将导致对象状态丢失。
+
+&nbsp;
+## 注意事项
+
+&emsp;&emsp;单例模式在多线程的应用场合下必须小心使用。如果当唯一实例尚未创建时，有两个线程同时调用创建方法，那么它们同时没有检测到唯一实例的存在，从而同时各自创建了一个实例，这样就有两个实例被构造出来，从而违反了单例模式中实例唯一的原则。 解决这个问题的办法是为指示类是否已经实例化的变量提供一个互斥锁(虽然这样会降低效率)。
+
+&nbsp;
+## 适用场景
+
+&emsp;&emsp;- 需要频繁的进行创建和销毁的对象；  
+&emsp;&emsp;- 创建对象时耗时过多或耗费资源过多，但又经常用到的对象；  
+&emsp;&emsp;- 工具类对象；  
+&emsp;&emsp;- 频繁访问数据库或文件的对象。  
+
+&nbsp;
+## 模式写法
+
+&emsp;
+
+### 饿汉模式
+
+&emsp;<div style="margin-top: -20px"><span style="color: #E5E5E5">优点：</span>饿汉模式的单例模式，在类加载时就实例化，避免了同步问题。</div>
+&emsp;<div><span style="color: #E5E5E5">缺点：</span>不如懒加载的效果，如果系统一直没有使用到该实例，造成资源浪费。<div>
+
+```java
+public class Singleton {
+
+    private final static Singleton INSTANCE = new Singleton();
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        return INSTANCE;
+    }
+
+}
+```
+
+### 饿汉模式(枚举)
+
+&emsp;<div style="margin-top: -20px"><span style="color: #E5E5E5">优点：</span>简单明了。枚举反编译可以看到 INSTANCE 其实是class的静态属性, 在单例枚举初始化的时候实例化 INSTANCE，<cinit>在JVM机制中是线程安全的。而且相对于其他单例模式，避免了反序列化而导致单例模式破坏问题，这个其他单例模式所不具备的。<span style="color: orange; font-size: 16px">目前最受人欢迎的做法。</span></div>
+&emsp;<div><span style="color: #E5E5E5">缺陷：</span>跟普通饿汉式的缺点一样。</div>
+
+```java
+public enum Singleton {
+
+    INSTANCE;
+
+}
+```
+
+### 懒汉模式(单线程)
+
+&emsp;<div style="margin-top: -20px"><span style="color: #E5E5E5">缺点：</span>线程安全问题，当同时有多个场景需要实例对象，在判断是否有实例时切换线程，这时会有两个线程都能进行初始化实例对象，即使同步类文件也没有用处。</div>
+
+```java
+public class Singleton {
+
+    private static Singleton singleton;
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (null == singleton) {
+            synchronized (Singleton.class) {
+                singleton = new singleton();
+            }
+        }
+        return singleton;
+    }
+
+}
+```
+
+### 懒汉模式(双重检测)
+
+&emsp;<div style="margin-top: -20px"><span style="color: #E5E5E5">优点：</span>懒汉模式的优势就是在场景需要的时候才实例化对象，相对于饿汉模式节省了资源，也有了线程安全性的保证。</div>
+&emsp;<div><span style="color: #E5E5E5">缺陷：</span>JVM有重排序策略，在new singleton()具体指令有三个：①分配空间给句柄  ②空间内创建句柄  ③堆内存创建对象赋值给句柄；  
+②依赖①，所以②一定在①后执行，但是③和②没有依赖，两个指令顺序可以对换, 如果先执行③, 切换线程, 线程在第一次判断单例对象是否为空时，句柄内已经有对象空间地址,  但是②还没有执行，没有创建对象，会出现空指针</div>
+
+```java
+public class Singleton {
+
+    private static Singleton singleton;
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        if (null == singleton) {
+            synchronized (Singleton.class) {
+                if (null == singleton) {
+                    singleton = new singleton();
+                }
+            }
+        }
+        return singleton;
+    }
+
+}
+```
+
+### 懒汉模式(静态内部类)
+
+&emsp;<div style="margin-top: -20px"><span style="color: #E5E5E5">优点：</span>相比于双重检测懒汉模式同步检测实例是否为空。静态内部类保证单例的方式是利用单例类中静态内部类，JVM在<cinit>进行类文件加锁，同步，不会产生线程安全性问题。</div>
+&emsp;<div><span style="color: #E5E5E5">缺陷：</span>由于是静态内部类的形式去创建单例的，故外部无法传递参数进去，例如Context这种参数。</div>
+
+```java
+public class Singleton {
+
+    private static class SingletonInstance {
+        private static final Singleton INSTANCE = new Singleton();
+    }
+
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        return SingletonInstance.INSTANCE;
+    }
+
+}
+```
