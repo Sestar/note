@@ -2393,7 +2393,8 @@ public class HystrixDashboardApplication {
 ```text
 访问 http://localhost:3791/timeoutHystrixOfProvider
 查看服务提供端的Console, 如果输出的Execution Time大于100, 则应该会被服务提供端的熔断器熔断,
-由于源码有设置回滚方法, 如果断点在回滚方法有执行, 这就代表服务提供端的熔断部署成功。
+由于服务提供端源码(..cloudserverprovider.web.controller.ServerProviderController#operaHystrix)
+有设置回滚方法, 如果断点在回滚方法有执行, 这就代表服务提供端的熔断部署成功。
 
 休眠时间在100毫秒附近, 有可能发生错误:
   第一次执行会有类加载问题, 加载也需要时间, 即使休眠90毫秒,如果加载类时间过长也会让执行时间超过100毫秒。
@@ -2401,7 +2402,142 @@ public class HystrixDashboardApplication {
   所以多测试几次, 看执行时间不在100毫秒附近
 ```
 
-##### 
+<br />
+
+##### 测试客户端的熔断部署
+
+```text
+访问 http://localhost:3791/timeoutHystrixOfProvider
+查看服务提供端的Console, 如果输出的Execution Time大于100, 会被服务提供端熔断, 也会被客户端熔断
+由于客户端源码(..springcloudribbonclient.hystrix.RibbonClientHystrixCommand)有设置回滚方法,
+如果断点在回滚方法有执行, 这就代表客户端的熔断部署成功。
+```
+
+<br />
+
+#### 查看Netflix Hystrix监控数据
+
+<br />
+
+##### 查看方法
+
+```text
+Netflix Hystrix获取监控数据有两种方式:
+    1. 熔断器自带获取监控数据 /hystrix.stream (必须有actuator插件)
+       访问 localhost:3771/hystrix.stream 获取json数据(下方展示),
+       json数组不够直观
+
+    2. 利用Netflix Hystrix Dashboard监控模块
+       访问 http://localhost:3751/hystrix,
+       在Hystrix DashBoard下方url填写localhost:3771/hystrix.stream
+       监控模块将会把json转化为图形数据
+```
+
+<br />
+
+##### /hystrix.stream获取的json数据
+
+```json
+data: {
+	"type": "HystrixCommand",
+	"name": "RibbonClientHystrixCommand",  // 自定义的HystrixCommand派生类
+	"group": "Ribbon-Client-Hystrix",      // 自定义的HystrixCommand的GroupKey
+	"currentTime": 1550025781920,
+	"isCircuitBreakerOpen": false,
+	"errorPercentage": 0,
+	"errorCount": 0,
+	"requestCount": 0,
+	"rollingCountBadRequests": 0,
+	"rollingCountCollapsedRequests": 0,
+	"rollingCountEmit": 0,
+	"rollingCountExceptionsThrown": 0,
+	"rollingCountFailure": 0,
+	"rollingCountFallbackEmit": 0,
+	"rollingCountFallbackFailure": 0,
+	"rollingCountFallbackMissing": 0,
+	"rollingCountFallbackRejection": 0,
+	"rollingCountFallbackSuccess": 0,
+	"rollingCountResponsesFromCache": 0,
+	"rollingCountSemaphoreRejected": 0,
+	"rollingCountShortCircuited": 0,
+	"rollingCountSuccess": 0,
+	"rollingCountThreadPoolRejected": 0,
+	"rollingCountTimeout": 0,
+	"currentConcurrentExecutionCount": 0,
+	"rollingMaxConcurrentExecutionCount": 0,
+	"latencyExecute_mean": 0,
+	"latencyExecute": {
+		"0": 0,
+		"25": 0,
+		"50": 0,
+		"75": 0,
+		"90": 0,
+		"95": 0,
+		"99": 0,
+		"99.5": 0,
+		"100": 0
+	},
+	"latencyTotal_mean": 0,
+	"latencyTotal": {
+		"0": 0,
+		"25": 0,
+		"50": 0,
+		"75": 0,
+		"90": 0,
+		"95": 0,
+		"99": 0,
+		"99.5": 0,
+		"100": 0
+	},
+	"propertyValue_circuitBreakerRequestVolumeThreshold": 20,
+	"propertyValue_circuitBreakerSleepWindowInMilliseconds": 5000,
+	"propertyValue_circuitBreakerErrorThresholdPercentage": 50,
+	"propertyValue_circuitBreakerForceOpen": false,
+	"propertyValue_circuitBreakerForceClosed": false,
+	"propertyValue_circuitBreakerEnabled": true,
+	"propertyValue_executionIsolationStrategy": "THREAD",
+	"propertyValue_executionIsolationThreadTimeoutInMilliseconds": 100,
+	"propertyValue_executionTimeoutInMilliseconds": 100,
+	"propertyValue_executionIsolationThreadInterruptOnTimeout": true,
+	"propertyValue_executionIsolationThreadPoolKeyOverride": null,
+	"propertyValue_executionIsolationSemaphoreMaxConcurrentRequests": 10,
+	"propertyValue_fallbackIsolationSemaphoreMaxConcurrentRequests": 10,
+	"propertyValue_metricsRollingStatisticalWindowInMilliseconds": 10000,
+	"propertyValue_requestCacheEnabled": true,
+	"propertyValue_requestLogEnabled": true,
+	"reportingHosts": 1,
+	"threadPool": "Ribbon-Client-Hystrix"
+}
+
+data: {
+	"type": "HystrixThreadPool",
+	"name": "Ribbon-Client-Hystrix",
+	"currentTime": 1550025781920,
+	"currentActiveCount": 0,
+	"currentCompletedTaskCount": 7,
+	"currentCorePoolSize": 10,
+	"currentLargestPoolSize": 7,
+	"currentMaximumPoolSize": 10,
+	"currentPoolSize": 7,
+	"currentQueueSize": 0,
+	"currentTaskCount": 7,
+	"rollingCountThreadsExecuted": 0,
+	"rollingMaxActiveThreads": 0,
+	"rollingCountCommandRejections": 0,
+	"propertyValue_queueSizeRejectionThreshold": 5,
+	"propertyValue_metricsRollingStatisticalWindowInMilliseconds": 10000,
+	"reportingHosts": 1
+}
+```
+
+<br />
+
+##### Hystrix DashBoard监控数据
+
+<img width="100%" src="/note/_v_images/java/框架/SpringCloud/HystrixDoard-1.png">
+
+<img width="100%" src="/note/_v_images/java/框架/SpringCloud/HystrixDoard-2.png">
+
 
 
 
