@@ -93,6 +93,26 @@ Edit Configurations -> 修改项目 -> 右上角Single instance Only勾选去除
 
 <br />
 
+## Run Dashboard
+
+<br />
+
+### 启动项目没有 Run Dashboard
+
+```text
+在.idea/workspace.xml文件中查找 <component name="RunDashboard"> 节点
+
+添加
+    <option name="configurationTypes">
+      <set>
+        <option value="SpringBootApplicationConfigurationType" />
+      </set>
+    </option>
+即可
+```
+
+<br />
+
 ## 随笔
 
 * <span style="color:orange">background task 自动弹出</span>  window->Background Task->Auto show

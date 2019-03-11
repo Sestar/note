@@ -155,3 +155,37 @@
         return cell;
     }
 ```
+
+<br />
+
+## 锁定单元格
+
+<br />
+
+### 主要思路
+
+```text
+需求: 前三列单元格不锁定, 其他单元格锁定不可编辑
+
+poi默认所有单元格样式都是锁定的, 单独对前三列单元格设置单元格样式
+```
+
+<br />
+
+### 代码部分
+
+```java
+// 不锁定单元格样式
+CellStyle noLockCellStyle = workbook.createCellStyle();
+noLockCellStyle.setLocked(false);
+// 前三列单元格不锁定
+for (short i = 0; i < 3; i++) {
+    // 单元格内容需要在设置单元格样式之前填充, 否则不锁定的单元格样式将会失效
+    Cell cell = firstRow.createCell(i);
+    cell.setCellValue("单元格内容");
+    // 设置单元格不锁定, i代表列数
+    sheet.setDefaultColumnStyle(i, noLockCellStyle);
+}
+// 设置密码, 若没有这句话, 锁定也会无效
+sheet.protectSheet(SHEET_PWD);
+```

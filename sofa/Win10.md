@@ -18,6 +18,7 @@ switch virtual window |   Win + Tab
 画板 |  mspaint
 注册表 | regedit
 计算器 | calc
+系统属性 | sysdm.cpl
 
 <br />
 ## 小功能

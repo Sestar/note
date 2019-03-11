@@ -182,7 +182,7 @@ endpoints.env.sensitive = false
 
 <br />
 
-#### 添加spring-cloud 服务器配置依赖
+#### Maven依赖
 
 ```xml
 <!-- spring-cloud-server -->
@@ -386,7 +386,7 @@ spring.cloud.config.server.git.username = userName
 ### 连接git的用户名密码
 spring.cloud.config.server.git.password = 123
 ### git远程仓库配置
-spring.cloud.config.server.git.uri = https://github.com/Sestar/firstLearn/tree/master/spring-cloud/cloud-config-files
+spring.cloud.config.server.git.uri = https://github.com/Sestar/cloud-config.git
 ### 强制拉取git内容, 如果本地副本是脏数据, 将强制从远程仓库拉取配置
 spring.cloud.config.server.git.force-pull = true
 ```
@@ -465,7 +465,7 @@ http://localhost:3771/spring-cloud-server/segments/prod
 ### 配置客户端
 <br />
 
-#### 添加spring-cloud 客户端配置依赖
+#### Maven依赖
 
 ```xml
 <!-- Spring-Cloud-Client -->
@@ -819,7 +819,7 @@ management.context-path = /config-server-actuator
 management.port = 3792
 
 ### git远程仓库配置
-spring.cloud.config.server.git.uri = https://github.com/Sestar/firstLearn/tree/master/spring-cloud/cloud-config-files
+spring.cloud.config.server.git.uri = https://github.com/Sestar/cloud-config.git
 ## 强制拉取git内容, 如果本地副本是脏数据, 将强制从远程仓库拉取配置
 spring.cloud.config.server.git.force-pull = true
 
@@ -843,7 +843,7 @@ banner.location = config/banner.txt
 
 <br />
 
-<img width="100%" src="/note/_v_images/java/框架/SpringCloud/Eureka服务配置端注册成功.png">
+<img width="30%" src="/note/_v_images/java/框架/SpringCloud/Eureka服务配置端注册成功.png">
 
 <br />
 
@@ -1967,6 +1967,12 @@ Eureka Client进行剔除)
 
 ### Netflix Hystrix 简介
 
+[原理解析](https://blog.csdn.net/onlyou930/article/details/77368962)
+
+<br />
+
+#### Netflix Hystrix使用原因
+
 ```text
 当有一个服务请求时间过长, 导致其他服务无法调用底层, 会极大影响其他服务, 造成"雪崩"现象,
 所以需要一个管理控件进行统一管理服务。
@@ -1974,7 +1980,89 @@ Eureka Client进行剔除)
 而 Netflix Hystrix 可以帮助隔离每个服务, 能使单个服务访问失败, 不会影响整个系统服务,
 这种机制也称作对某个服务进行熔断, 这种熔断机制, 极大提升整个服务的可靠性, 可用性。
 
-Netflix Hystrix的使用方式有两种：
+在大中型分布式系统中，通常系统很多依赖(HTTP,hession,Netty,Dubbo等)，在高并发访问下,这些依赖的稳定性与否对系统的影响非常大,但是依赖有很多不可控问题:如网络连接缓慢，资源繁忙，暂时不可用，服务脱机等。
+
+当依赖阻塞时,大多数服务器的线程池就出现阻塞(BLOCK),影响整个线上服务的稳定性，在复杂的分布式架构的应用程序有很多的依赖，都会不可避免地在某些时候失败。高并发的依赖失败时如果没有隔离措施，当前应用服务就有被拖垮的风险。
+
+例如:一个依赖30个SOA服务的系统,每个服务99.99%可用。
+99.99%的30次方 ≈ 99.7%
+0.3% 意味着一亿次请求 会有 3,000,00次失败
+换算成时间大约每月有2个小时服务不稳定.
+随着服务依赖数量的变多，服务不稳定的概率会成指数性提高.
+```
+
+<br />
+
+#### 设计理念
+
+<div style="width:100%; text-align:center; margin: 0 auto;">
+    <img width="80%" src="/note/_v_images/java/框架/SpringCloud/Hystrix-designIdea-1.png">
+</div>
+
+```text
+Command是在Receiver和Invoker之间添加的中间层，Command实现了对Receiver的封装。
+那么Hystrix的应用场景如何与上图对应呢？
+
+API既可以是Invoker又可以是reciever，通过继承Hystrix核心类HystrixCommand来封装这些API
+（例如，远程接口调用，数据库查询之类可能会产生延时的操作）。就可以为API提供弹性保护了。
+```
+
+<br />
+
+#### Hystrix流程结构解析
+
+<img width="100%" src="/note/_v_images/java/框架/SpringCloud/Hystrix-process-1.png">
+
+```text
+流程说明:
+
+1:每次调用创建一个新的HystrixCommand,把依赖调用封装在run()方法中.
+2:执行execute()/queue做同步或异步调用.
+3:判断熔断器(circuit-breaker)是否打开,如果打开跳到步骤8,进行降级策略,如果关闭进入步骤.
+4:判断线程池/队列/信号量是否跑满，如果跑满进入降级步骤8,否则继续后续步骤.
+5:调用HystrixCommand的run方法.运行依赖逻辑
+5a:依赖逻辑调用超时,进入步骤8.
+6:判断逻辑是否调用成功
+6a:返回成功调用结果
+6b:调用出错，进入步骤8.
+7:计算熔断器状态,所有的运行状态(成功, 失败, 拒绝, 超时)上报给熔断器，用于统计从而判断熔断器状态.
+8:getFallback()降级逻辑.
+  以下四种情况将触发getFallback调用：
+  (1):run()方法抛出非HystrixBadRequestException异常。
+  (2):run()方法调用超时
+  (3):熔断器开启拦截调用
+  (4):线程池/队列/信号量是否跑满
+8a:没有实现getFallback的Command将直接抛出异常
+8b:fallback降级逻辑调用成功直接返回
+8c:降级逻辑调用失败抛出异常
+9:返回执行成功结果
+```
+
+<br />
+
+#### CircuitBreaker流程结构解析
+
+```text
+每个熔断器默认维护10个bucket,每秒一个bucket,每个bucket记录成功,失败,超时,拒绝的状态，
+默认错误超过50%且10秒内超过20个请求进行中断拦截.
+```
+
+<div style="width:100%; text-align:center; margin: 0 auto;">
+    <img width="80%" src="/note/_v_images/java/框架/SpringCloud/Hystrix-circuitBreaker-process-1.png">
+</div>
+
+<br />
+
+#### HystrixCommand注解
+
+```text
+在@HystrixCommand注解中添加Command配置,
+查看官网 https://github.com/Netflix/Hystrix/wiki/Configuration
+```
+
+#### Netflix Hystrix使用方式
+
+```text
   1. 注解方式
   1.1 在启动类上添加@EnableHystrix
   1.2 在需要熔断机制的服务上添加@HystrixCommand(), 在里面填写具体的command配置
@@ -2000,16 +2088,6 @@ Netflix Hystrix 两个使用方式区别：
 
 <br />
 
-### @EnableCircuitBreaker
-
-@EnableCircuitBreaker 初始化顺序
-
-* @EnableCircuitBreaker
-    * EnableCircuitBreakerImportSelector
-        * HystrixCircuitBreakerConfiguration
-
-<br />
-
 ### ReadMeFirst
 
 ```text
@@ -2020,11 +2098,17 @@ Module:
     hystrix-dashboard(Hystrix监控).
 
 user-service-provider(服务提供端):
-    启动类激活@EnableHystrix
+    1. application.properties关闭Eureka
+    2. 启动类激活@EnableHystrix
+
     使用Hystrix的方式是在服务添加HystrixCommand, 增加超时熔断, 自定义回滚方法
 
 user-service-client(客户端):
-    启动类激活@EnabelCircuitBreaker(由于使用HystrixCommand派生类, 不激活也能使用)
+    1. application.properties启用Ribbon LoadBalancerClient 提供服务列表并关闭Eureka
+    2. 启动类激活@EnabelCircuitBreaker(由于使用HystrixCommand派生类, 不激活也能使用)
+    3. bootstrap配置不要调用(改名即可)
+    4. 使用 Service-provider 的相关内容
+
     使用Hystrix的方式是利用RibbonClientHystrixCommand(HystrixCommand的派生类)#run
 
 hystrix-dashboard(Hystrix监控):
@@ -2033,11 +2117,11 @@ hystrix-dashboard(Hystrix监控):
 
 <br />
 
-#### 搭建服务提供端
+### 搭建服务提供端
 
 <br />
 
-##### Maven依赖
+#### Maven依赖
 
 ```xml
 <!-- Netflix Hystrix -->
@@ -2057,7 +2141,7 @@ hystrix-dashboard(Hystrix监控):
 
 <br />
 
-##### 启动类注册熔断器
+#### 启动类注册熔断器
 
 ```Java
 package com.sestar.cloudserverprovider;
@@ -2081,12 +2165,7 @@ public class CloudServerProviderApplication {
 
 <br />
 
-##### 服务添加Hystrix Command配置
-
-```text
-在@HystrixCommand注解中添加Command配置, 
-查看官网 https://github.com/Netflix/Hystrix/wiki/Configuration
-```
+#### 服务添加Hystrix Command配置
 
 ```Java
 package com.sestar.cloudserverprovider.web.controller;
@@ -2152,11 +2231,11 @@ public class ServerProviderController {
 
 <br />
 
-#### 搭建客户端
+### 搭建客户端
 
 <br />
 
-##### Maven依赖
+#### Maven依赖
 
 ```xml
 <!-- Netflix Hystrix -->
@@ -2176,7 +2255,7 @@ public class ServerProviderController {
 
 <br />
 
-##### 启动类注册熔断器
+#### 启动类注册熔断器
 
 ```Java
 package com.sestar.springcloudribbonclient;
@@ -2191,7 +2270,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
-@RibbonClient(name = "cloud-server-provider-application")
+@RibbonClient(name = "user-server-provider-application")
 @EnableDiscoveryClient // 使用Eureka服务发现方式发现服务提供端
 @EnableCircuitBreaker  // Netflix Hystrix 熔断器
 public class SpringCloudRibbonClientApplication {
@@ -2222,7 +2301,7 @@ public class SpringCloudRibbonClientApplication {
 
 <br />
 
-##### 自定义HystrixCommand派生类
+#### 自定义HystrixCommand派生类
 
 ```Java
 package com.sestar.springcloudribbonclient.hystrix;
@@ -2271,7 +2350,7 @@ public class RibbonClientHystrixCommand extends HystrixCommand<Object> {
 
 <br />
 
-##### HystrixCommand派生类访问服务
+#### HystrixCommand派生类访问服务
 
 ```text
 从下面源码可以看出, 如果使用HystrixCommand方式, 每个HystrixCommand只能访问一次, 所以servlet每次
@@ -2355,11 +2434,11 @@ public class RibbonClientController {
 
 <br />
 
-#### 搭建Netflix Hystrix监控模块
+### 搭建Netflix Hystrix监控模块
 
 <br />
 
-##### Maven依赖
+#### Maven依赖
 
 ```xml
 <!-- Hystrix Dashboard -->
@@ -2379,7 +2458,7 @@ public class RibbonClientController {
 
 <br />
 
-##### 启动类注册为Netflix Hystrix监控平台
+#### 启动类注册为Netflix Hystrix监控平台
 
 ```Java
 package com.sestar.hystrixdashboard;
@@ -2401,24 +2480,14 @@ public class HystrixDashboardApplication {
 
 <br />
 
-#### 测试熔断部署
+### 测试熔断部署
 
 <br />
 
-##### 测试Eureka部署
+#### 测试服务提供端的熔断部署
 
 ```text
-访问 http://localhost:3781/
-查看Eureka注册实例(Instances currently registered with Eureka)是否有服务提供端和Ribbon Client
-如果有这两个实例则代表Eureka部署成功
-```
-
-<br />
-
-##### 测试服务提供端的熔断部署
-
-```text
-访问 http://localhost:3791/timeoutHystrixOfProvider
+访问 http://localhost:3721/timeoutHystrixOfProvider
 查看服务提供端的Console, 如果输出的Execution Time大于100, 则应该会被服务提供端的熔断器熔断,
 由于服务提供端源码(..cloudserverprovider.web.controller.ServerProviderController#operaHystrix)
 有设置回滚方法, 如果断点在回滚方法有执行, 这就代表服务提供端的熔断部署成功。
@@ -2431,10 +2500,10 @@ public class HystrixDashboardApplication {
 
 <br />
 
-##### 测试客户端的熔断部署
+#### 测试客户端的熔断部署
 
 ```text
-访问 http://localhost:3791/timeoutHystrixOfProvider
+访问 http://localhost:3721/timeoutHystrixOfProvider
 查看服务提供端的Console, 如果输出的Execution Time大于100, 会被服务提供端熔断, 也会被客户端熔断
 由于客户端源码(..springcloudribbonclient.hystrix.RibbonClientHystrixCommand)有设置回滚方法,
 如果断点在回滚方法有执行, 这就代表客户端的熔断部署成功。
@@ -2442,16 +2511,16 @@ public class HystrixDashboardApplication {
 
 <br />
 
-#### 查看Netflix Hystrix监控数据
+### 查看Netflix Hystrix监控数据
 
 <br />
 
-##### Hystrix Stream数据
+#### Hystrix Stream数据
 
 ```text
 Netflix Hystrix获取监控数据有两种方式:
     1. 熔断器自带获取监控数据 /hystrix.stream (必须有actuator插件)
-       访问 localhost:3771/hystrix.stream 获取json数据(下方展示),
+       访问 localhost:3741/hystrix.stream 获取json数据(下方展示),
        json数组不够直观
 
     2. 利用Netflix Hystrix Dashboard监控模块
@@ -2462,7 +2531,7 @@ Netflix Hystrix获取监控数据有两种方式:
 
 <br />
 
-##### /hystrix.stream获取的json数据
+#### /hystrix.stream json数据样例
 
 ```json
 data: {
@@ -2559,15 +2628,1324 @@ data: {
 
 <br />
 
-##### Hystrix DashBoard图例化
+#### Hystrix DashBoard图例化
 
 <img width="100%" src="/note/_v_images/java/框架/SpringCloud/HystrixDoard-1.png">
 
 <img width="100%" src="/note/_v_images/java/框架/SpringCloud/HystrixDoard-2.png">
 
+<br />
 
+## Feign(熔断器 + 负载均衡)
 
+[参考源码](https://github.com/Sestar/firstLearn/tree/master/spring-cloud/cloud-multiple)
 
+<br />
 
+### Feign 简介
 
+```text
+Feign是 Netflix 和 Ribbon 的整合。也就是实现了熔断和负载均衡的功能。
+是一个申明式的Web Service, 可以让 Web Service调用更加简单。源码中就是让User Client调用
+User api中Feign申明的接口, 在user provider中实现服务, 让服务实现不是直接暴露在User Client
+```
 
+<br />
+
+### ReadMeFirst
+
+```text
+源码是spring boot多个功能的集合, 本节主要介绍Feign
+
+Module:
+    eureka-server(Eureka服务注册端), config-server(服务配置端),
+    user-api(用户服务API), user-service-provider(服务提供端),
+    user-service-client(客户端).
+
+user-service-provider(服务提供端):
+    application.properties开启Eureka
+    启动类激活@EnableHystrix, @EnableDiscoveryClient
+    使用Hystrix的方式是在服务添加HystrixCommand, 增加超时熔断, 自定义回滚方法
+
+user-service-client(客户端):
+    application.properties启用Ribbon LoadBalancerClient 提供服务列表并关闭Eureka
+    启动类激活@RibbonClient, @EnableDiscoveryClient, @EnabelFeignClients
+    关闭ribbon.listOfServers, Feign和Service-provider(config-server的profile中获取)
+```
+
+<br />
+
+### 结构图
+
+<br />
+
+<img width="30%" src="/note/_v_images/java/框架/SpringCloud/Feign-1.png">
+
+<br />
+
+### 搭建服务配置端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- Spring Cloud Config Server -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-config-server</artifactId>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## Eureka
+### Eureka 注册
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+### Eureka 使用 IP 注册, 不使用IP注册user-service-client无法找到config-server, 具体原因不知道
+eureka.instance.prefer-ip-address = true
+
+## 配置服务器文件系统git仓库, 配置文件git仓库最好是git单独的repository
+spring.cloud.config.server.git.uri = https://github.com/Sestar/cloud-config.git
+## 强制拉取git内容, 如果本地副本是脏数据, 将强制从远程仓库拉取配置
+spring.cloud.config.server.git.force-pull = true
+```
+
+<br />
+
+#### 启动类注册Eureka Client, Config Server
+
+```java
+package com.sestar.configserver;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.config.server.EnableConfigServer;
+
+/**
+ * @description Config Server
+ * @author zhangxinxin
+ * @date 2019/2/18 14:15
+ **/
+@SpringBootApplication
+@EnableDiscoveryClient  // 能够Eureka发现
+@EnableConfigServer     // Cloud Server
+public class ConfigServerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+
+}
+```
+
+<br />
+
+### 搭建用户服务API模块
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- 添加 Spring Cloud Feign 依赖 -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-feign</artifactId>
+</dependency>
+```
+
+<br />
+
+#### 编写一个服务API 实现 Feign
+
+<br />
+
+##### Feign 服务接口
+
+```Java
+package com.sestar.userapi.api;
+
+import com.sestar.userapi.domain.User;
+import com.sestar.userapi.hystrix.UserServerFallBack;
+import org.springframework.cloud.netflix.feign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+
+import java.util.List;
+
+/**
+ * @description 用户服务API
+ * @author zhangxinxin
+ * @date 2019/2/15 18:00
+ */
+@FeignClient(name = "${user.server.name}", fallback = UserServerFallBack.class)
+// user.server.name通过config-server获取配置文件中得到
+public interface IUserService {
+
+    /**
+     * @description 保存用户
+     * @author zhangxinxin
+     * @date 2019/2/15 17:59
+     * @param user 用户信息
+     * @return boolean
+     */
+    @PostMapping("/user/save")
+    boolean saveUser(User user);
+
+    /**
+     * @description 查询所有的用户列表
+     * @author zhangxinxin
+     * @date 2019/2/15 17:59
+     * @return java.util.List<com.sestar.userapi.domain.User>
+     */
+    @GetMapping("/user/find/all")
+    List<User> findAll();
+
+}
+```
+
+<br />
+
+##### Feign 回滚(暂未实现)
+
+```Java
+package com.sestar.userapi.hystrix;
+
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * @description IUserService FallBack
+ * @author zhangxinxin
+ * @date 2019/2/18 9:55
+ **/
+public class UserServerFallBack implements IUserService {
+
+    @Override
+    public boolean saveUser(User user) {
+        return false;
+    }
+
+    @Override
+    public List<User> findAll() {
+        return Collections.emptyList();
+    }
+}
+```
+
+<br />
+
+### 搭建服务提供端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- 依赖 用户 API -->
+<dependency>
+    <groupId>com.sestar</groupId>
+    <artifactId>user-api</artifactId>
+    <version>${project.version}</version>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+
+<!-- Netflix Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-hystrix</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## Eureka
+### Eureka注册
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+### 上传注册信息时间间隔
+eureka.client.instance-info-replication-interval-seconds = 5
+### 获取注册信息时间间隔
+eureka.client.registry-fetch-interval-seconds = 5
+### Eureka注册名使用IP
+eureka.instance.prefer-ip-address = true
+```
+
+<br />
+
+#### 启动类注册Eureka Client, 实现Hystrix
+
+```Java
+package com.sestar.userserverprovider;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.netflix.hystrix.EnableHystrix;
+
+@SpringBootApplication
+@EnableDiscoveryClient // 使用Eureka服务发现方式发现服务提供端
+@EnableHystrix // Netflix Hystrix 熔断器
+public class UserServerProviderApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(UserServerProviderApplication.class, args);
+    }
+
+}
+```
+
+<br />
+
+#### Controller实现用户服务API的接口
+
+```Java
+package com.sestar.userserverprovider.web.controller;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+
+/**
+ * @description Server Provider Controller
+ * @author zhangxinxin
+ * @date 2019/1/10 14:30
+ **/
+@RestController
+public class UserServiceProviderController implements IUserService {
+
+    /**
+     * 用户服务中心
+     **/
+    private final IUserService userServer;
+
+    /**
+     * 随机数工具类
+     **/
+    private static final Random random = new Random();
+
+    @Value("${server.port}")
+    private String port;
+
+    @Autowired
+    public UserServiceProviderController(@Qualifier("inMemoryUserService") IUserService userServer) {
+        this.userServer = userServer;
+    }
+
+    // 通过方法继承，URL 映射 ："/user/save"
+    @Override
+    public boolean saveUser(@RequestBody User user) {
+        return userServer.saveUser(user);
+    }
+
+    // 通过方法继承，URL 映射 ："/user/find/all"
+    @HystrixCommand(
+            commandProperties = {   // command 配置
+                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "100") // 设置最大执行时间
+            },
+            fallbackMethod = "fallbackForGetUsers" // 设置熔断后执行回滚方法
+    )
+    @Override
+    public List<User> findAll() {
+        return userServer.findAll();
+    }
+
+    // ...省略其他不相关内容
+}
+```
+
+<br />
+
+#### ServiceImpl 实现用户服务API接口
+
+```Java
+package com.sestar.userserverprovider.web.service;
+
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * @description 用户服务
+ * @author zhangxinxin
+ * @date 2019/2/15 20:42
+ **/
+@Service("inMemoryUserService")
+public class InMemoryUserService implements IUserService {
+
+    private Map<Long, User> repository = new ConcurrentHashMap<>();
+
+    @Override
+    public boolean saveUser(User user) {
+        return repository.put(user.getId(), user) == null;
+    }
+
+    @Override
+    public List<User> findAll() {
+        return new ArrayList(repository.values());
+    }
+
+}
+```
+
+<br />
+
+### 搭建客户端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- 依赖 用户 API -->
+<dependency>
+    <groupId>com.sestar</groupId>
+    <artifactId>user-api</artifactId>
+    <version>${project.version}</version>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+
+<!-- Ribbon -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-ribbon</artifactId>
+</dependency>
+
+<!-- Netflix Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-hystrix</artifactId>
+</dependency>
+
+<!-- Config Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-config-client</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## Ribbon
+### 配置名称可以看 org.springframework.cloud.netflix.ribbon.PropertiesFactory
+user-service-provider-application.ribbon.NFLoadBalancerRuleClassName = com.sestar.userserviceclient.loadbalanced.MyRule
+user-service-provider-application.ribbon.NFLoadBalancerPingClassName = com.sestar.userserviceclient.loadbalanced.MyPing
+```
+
+<br />
+
+#### bootstrap.properties
+
+```properties
+## 应用名称
+spring.application.name = user-service-client-application
+
+##  Eureka
+### spring-eureka-server-application注册到 Eureka 服务器中
+### ${}都为服务器的配置内容 http://服务器地址:${server.port}/${server.context-path}/eureka
+### 如果 bootstrap 有配置 spring.cloud.config.discovery.service-id, 则需要把该配置移到 bootstrap 中
+### 因为*.discovery.service-id属性是查找 Eureka 服务配置端, 而查找范围就是eureka.client.service-url.defaultZone
+### 需要最先加载 Eureka 注册信息, eureka.client.service-url.defaultZone才能确定范围,
+### 而 *.discovery.service-id属性配置在 bootstrap 中, 比 application 配置先加载,
+### 所以当有配置Eureka服务配置端, 则需要把 eureka.client.service-url.defaultZone必须配置在 bootstrap 中
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+
+## 配置客户端应用关联的应用
+## spring.cloud.config.name 是可选的
+## 如果没有配置，采用 ${spring.application.name}
+spring.cloud.config.name = user-server
+## 关联profile
+spring.cloud.config.profile = default
+## 关联label
+spring.cloud.config.label = master
+## 激活 Config Server 服务发现和 spring.cloud.config.discovery.serviceId 捆绑配置
+spring.cloud.config.discovery.enabled = true
+## Config Server 服务器应用名称
+spring.cloud.config.discovery.serviceId = config-server-application
+```
+
+<br />
+
+#### 启动类注册RibbonClient, Eureka Client; 开启Hystrix, FeignClient
+
+```Java
+package com.sestar.userserviceclient;
+
+import com.sestar.userapi.api.IUserService;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.cloud.netflix.feign.EnableFeignClients;
+import org.springframework.cloud.netflix.ribbon.RibbonClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.client.RestTemplate;
+
+@SpringBootApplication
+@RibbonClient(name = "user-service-provider-application")
+@EnableDiscoveryClient // 使用Eureka服务发现方式发现服务提供端
+@EnableCircuitBreaker  // Netflix Hystrix 熔断器
+@EnableFeignClients(clients = IUserService.class) // 申明 UserService 接口作为 Feign Client 调用
+public class UserServiceClientApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(UserServiceClientApplication.class, args);
+    }
+
+    /**
+     * @description 获取用以负载均衡的RestTemplate的Bean对象,
+     *          注释@LoadBalanced将会把RestTemplate也注册为 LoadBalancerClient,
+     *          所以如果自动注入LoadBalancerClient对象也是本方法返回对象
+     *          而且使用该RestTemplate.execute调用的也是LoadBalancerClient#execute
+     * @author zhangxinxin
+     * @date 2019/1/10 14:43
+     * @return org.springframework.web.client.RestTemplate
+     **/
+    @Bean(name = "loadBalanceRestTemplate")
+    @LoadBalanced
+    public RestTemplate getLoadBalanceRestTemplate() {
+        return new RestTemplate();
+    }
+
+    // ...省略其他不相关内容
+}
+```
+
+<br />
+
+#### Controller调用用户服务API的接口
+
+```Java
+package com.sestar.userserviceclient.web.controller;
+
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * @description Server Client Controller
+ * @author zhangxinxin
+ * @date 2019/2/15 21:30
+ **/
+@RestController
+public class UserServiceClientController {
+
+    /**
+     * 用户服务中心
+     **/
+    @SuppressWarnings("all")
+    @Autowired
+    private IUserService userServer;
+
+    @PostMapping("/user/save")
+    public boolean saveUser(@RequestBody User user) {
+        return userServer.saveUser(user);
+    }
+
+    @GetMapping("/user/find/all")
+    public List<User> findAll() {
+        return userServer.findAll();
+    }
+
+}
+```
+
+### 测试Feign熔断和负载
+
+<br />
+
+#### 熔断(暂时只有Hystrix, Feign.fallback暂未实现)
+
+```text
+访问 http://localhost:3721/timeoutHystrix
+如果user-service-provider-application的console输出Execution Time超过100, Hystrix将会进行超时熔断, 
+页面输出 “operaHystrix Method Execution is cutting out!”
+```
+
+<br />
+
+#### 负载均衡
+
+```text
+1. user-service-provider-application启动多个端口: 3741, 3751, 3761
+
+2. 用postman POST访问 http://localhost:3761/user/save, Body传User的json: {"id": 1, "name": "sestar"}
+对三个不同端口存储不同User对象;
+
+3. GET 访问 http://localhost:3721/user/find/all, 每次返回User对象不一样(端口不同, 在默认负载均衡IRule下)
+```
+
+<br />
+
+## 路由(Zuul)
+
+[参考源码](https://github.com/Sestar/firstLearn/tree/master/spring-cloud/cloud-multiple)
+
+<br />
+
+### 简介
+
+```text
+激活Zuul有两种方式:
+    1. @EnableZuulServer
+       导入ZuulServerMarkerConfiguration, 随后生成一个ZuulServerMarkerConfiguration.Marker的Bean对象,
+       作为ZuulServerAutoConfiguration的装配前置条件
+
+       Web请求时会交给 DispatcherServlet 处理, 再获取 DispatcherServlet.handlerMappings 匹配映射地址进行访问
+       handlerMapperings 是 ApplicationContext 匹配 HandlerMapper.class(DispatcherServlet#initHandlerMappings),
+       在此之前其实ZuulServerAutoConfiguration#zuulHandlerMapping 已经生成 ZuulHandlerMapping(基类是HandlerMapper)
+       ZuulController 将请求委派给 ZuulServlet, 所以所有的 ZuulFilter 实例都会被执行
+
+       处理顺序：DispatcherServlet -> ZuulHandlerMapping -> ZuulController -> ZuulServlet -> ZuulFilter
+
+    2. @EnableZuulProxy
+       导入ZuulProxyMarkerConfiguration, 随后生成一个ZuulProxyMarkerConfiguration.Marker的Bean对象,
+       作为ZuulProxyAutoConfiguration的装配前置条件
+
+       处理顺序：DispatcherServlet -> ZuulHandlerMapping -> ZuulController -> ZuulServlet -> RibbonRoutingFilter
+
+两种激活方式的区别其实就是 ZuulProxyAutoConfiguration 和 ZuulServerAutoConfiguration 的区别:
+    ZuulServerAutoConfiguration 最后是 ZuulFilter 过滤处理
+    ZuulProxyAutoConfiguration 最后是 RibbonRoutingFilter(基类ZuulFilter) 过滤处理
+    ZuulProxyAutoConfiguration 指定了 ZuulFilter 的类型: RibbonRoutingFilter
+```
+
+<br />
+
+### ReadMeFirst
+
+```text
+源码是spring boot多个功能的集合, 本节主要介绍Zuul
+
+Module:
+    eureka-server(Eureka服务注册端), config-server(服务配置端),
+    user-api(用户服务API), user-service-provider(服务提供端),
+    user-service-client(客户端), zuul-proxy(路由管理端).
+
+user-service-provider(服务提供端):
+    application.properties开启Eureka
+    启动类激活@EnableHystrix, @EnableDiscoveryClient
+    使用Hystrix的方式是在服务添加HystrixCommand, 增加超时熔断, 自定义回滚方法
+
+user-service-client(客户端):
+    application.properties开启Eureka
+    启动类激活@RibbonClient, @EnableDiscoveryClient, @EnabelFeignClients
+    关闭ribbon.listOfServers, Feign和Service-provider(config-server的profile中获取)
+
+zuul-proxy(路由管理端):
+    application.properties开启Eureka
+    启动类激活@EnableZuulProxy
+    关闭ribbon.listOfServers, zuul.routes(config-server的profile中获取)
+```
+
+<br />
+
+### 结构图
+
+<img width="30%" src="/note/_v_images/java/框架/SpringCloud/Zuul-1.png">
+
+<br />
+
+### 搭建服务配置端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- Spring Cloud Config Server -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-config-server</artifactId>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## Eureka
+### Eureka 注册
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+### Eureka 使用 IP 注册, 不使用IP注册user-service-client无法找到config-server, 具体原因不知道
+eureka.instance.prefer-ip-address = true
+
+## 配置服务器文件系统git仓库, 配置文件git仓库最好是git单独的repository
+spring.cloud.config.server.git.uri = https://github.com/Sestar/cloud-config.git
+## 强制拉取git内容, 如果本地副本是脏数据, 将强制从远程仓库拉取配置
+spring.cloud.config.server.git.force-pull = true
+```
+
+<br />
+
+#### 启动类注册Eureka Client, Config Server
+
+```java
+package com.sestar.configserver;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.config.server.EnableConfigServer;
+
+/**
+ * @description Config Server
+ * @author zhangxinxin
+ * @date 2019/2/18 14:15
+ **/
+@SpringBootApplication
+@EnableDiscoveryClient  // 能够Eureka发现
+@EnableConfigServer     // Cloud Server
+public class ConfigServerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+
+}
+```
+
+<br />
+
+### 搭建用户服务API模块
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- 添加 Spring Cloud Feign 依赖 -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-feign</artifactId>
+</dependency>
+```
+
+<br />
+
+#### 服务接口(Feign功能可以忽略不看)
+
+```Java
+package com.sestar.userapi.api;
+
+import com.sestar.userapi.domain.User;
+import com.sestar.userapi.hystrix.UserServerFallBack;
+import org.springframework.cloud.netflix.feign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+
+import java.util.List;
+
+/**
+ * @description 用户服务API
+ * @author zhangxinxin
+ * @date 2019/2/15 18:00
+ */
+@FeignClient(name = "${user.server.name}", fallback = UserServerFallBack.class)
+// user.server.name通过config-server获取配置文件中得到
+public interface IUserService {
+
+    /**
+     * @description 保存用户
+     * @author zhangxinxin
+     * @date 2019/2/15 17:59
+     * @param user 用户信息
+     * @return boolean
+     */
+    @PostMapping("/user/save")
+    boolean saveUser(User user);
+
+    /**
+     * @description 查询所有的用户列表
+     * @author zhangxinxin
+     * @date 2019/2/15 17:59
+     * @return java.util.List<com.sestar.userapi.domain.User>
+     */
+    @GetMapping("/user/find/all")
+    List<User> findAll();
+
+}
+```
+
+<br />
+
+### 搭建服务提供端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- 依赖 用户 API -->
+<dependency>
+    <groupId>com.sestar</groupId>
+    <artifactId>user-api</artifactId>
+    <version>${project.version}</version>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+
+<!-- Netflix Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-hystrix</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## Eureka
+### Eureka注册
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+### 上传注册信息时间间隔
+eureka.client.instance-info-replication-interval-seconds = 5
+### 获取注册信息时间间隔
+eureka.client.registry-fetch-interval-seconds = 5
+### Eureka注册名使用IP
+eureka.instance.prefer-ip-address = true
+```
+
+<br />
+
+#### 启动类注册Eureka Client, 实现Hystrix
+
+```Java
+package com.sestar.userserverprovider;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.netflix.hystrix.EnableHystrix;
+
+@SpringBootApplication
+@EnableDiscoveryClient // 使用Eureka服务发现方式发现服务提供端
+@EnableHystrix // Netflix Hystrix 熔断器
+public class UserServerProviderApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(UserServerProviderApplication.class, args);
+    }
+
+}
+```
+
+<br />
+
+#### Controller实现用户服务API的接口
+
+```Java
+package com.sestar.userserverprovider.web.controller;
+
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+
+/**
+ * @description Server Provider Controller
+ * @author zhangxinxin
+ * @date 2019/1/10 14:30
+ **/
+@RestController
+public class UserServiceProviderController implements IUserService {
+
+    /**
+     * 用户服务中心
+     **/
+    private final IUserService userServer;
+
+    /**
+     * 随机数工具类
+     **/
+    private static final Random random = new Random();
+
+    @Value("${server.port}")
+    private String port;
+
+    @Autowired
+    public UserServiceProviderController(@Qualifier("inMemoryUserService") IUserService userServer) {
+        this.userServer = userServer;
+    }
+
+    // 通过方法继承，URL 映射 ："/user/save"
+    @Override
+    public boolean saveUser(@RequestBody User user) {
+        return userServer.saveUser(user);
+    }
+
+    // 通过方法继承，URL 映射 ："/user/find/all"
+    @HystrixCommand(
+            commandProperties = {   // command 配置
+                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "100") // 设置最大执行时间
+            },
+            fallbackMethod = "fallbackForGetUsers" // 设置熔断后执行回滚方法
+    )
+    @Override
+    public List<User> findAll() {
+        return userServer.findAll();
+    }
+
+    // ...省略其他不相关内容
+}
+```
+
+<br />
+
+#### ServiceImpl 实现用户服务API接口
+
+```Java
+package com.sestar.userserverprovider.web.service;
+
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * @description 用户服务
+ * @author zhangxinxin
+ * @date 2019/2/15 20:42
+ **/
+@Service("inMemoryUserService")
+public class InMemoryUserService implements IUserService {
+
+    private Map<Long, User> repository = new ConcurrentHashMap<>();
+
+    @Override
+    public boolean saveUser(User user) {
+        return repository.put(user.getId(), user) == null;
+    }
+
+    @Override
+    public List<User> findAll() {
+        return new ArrayList(repository.values());
+    }
+
+}
+```
+
+<br />
+
+### 搭建客户端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- 依赖 用户 API -->
+<dependency>
+    <groupId>com.sestar</groupId>
+    <artifactId>user-api</artifactId>
+    <version>${project.version}</version>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+
+<!-- Ribbon -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-ribbon</artifactId>
+</dependency>
+
+<!-- Netflix Hystrix -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-hystrix</artifactId>
+</dependency>
+
+<!-- Config Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-config-client</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## Ribbon
+### 配置名称可以看 org.springframework.cloud.netflix.ribbon.PropertiesFactory
+user-service-provider-application.ribbon.NFLoadBalancerRuleClassName = com.sestar.userserviceclient.loadbalanced.MyRule
+user-service-provider-application.ribbon.NFLoadBalancerPingClassName = com.sestar.userserviceclient.loadbalanced.MyPing
+```
+
+<br />
+
+#### bootstrap.properties
+
+```properties
+## 应用名称
+spring.application.name = user-service-client-application
+
+##  Eureka
+### spring-eureka-server-application注册到 Eureka 服务器中
+### ${}都为服务器的配置内容 http://服务器地址:${server.port}/${server.context-path}/eureka
+### 如果 bootstrap 有配置 spring.cloud.config.discovery.service-id, 则需要把该配置移到 bootstrap 中
+### 因为*.discovery.service-id属性是查找 Eureka 服务配置端, 而查找范围就是eureka.client.service-url.defaultZone
+### 需要最先加载 Eureka 注册信息, eureka.client.service-url.defaultZone才能确定范围,
+### 而 *.discovery.service-id属性配置在 bootstrap 中, 比 application 配置先加载,
+### 所以当有配置Eureka服务配置端, 则需要把 eureka.client.service-url.defaultZone必须配置在 bootstrap 中
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+
+## 配置客户端应用关联的应用
+## spring.cloud.config.name 是可选的
+## 如果没有配置，采用 ${spring.application.name}
+spring.cloud.config.name = user-server
+## 关联profile
+spring.cloud.config.profile = default
+## 关联label
+spring.cloud.config.label = master
+## 激活 Config Server 服务发现和 spring.cloud.config.discovery.serviceId 捆绑配置
+spring.cloud.config.discovery.enabled = true
+## Config Server 服务器应用名称
+spring.cloud.config.discovery.serviceId = config-server-application
+```
+
+<br />
+
+#### 启动类注册RibbonClient, Eureka Client; 开启Hystrix, FeignClient
+
+```Java
+package com.sestar.userserviceclient;
+
+import com.sestar.userapi.api.IUserService;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import org.springframework.cloud.netflix.feign.EnableFeignClients;
+import org.springframework.cloud.netflix.ribbon.RibbonClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.client.RestTemplate;
+
+@SpringBootApplication
+@RibbonClient(name = "user-service-provider-application")
+@EnableDiscoveryClient // 使用Eureka服务发现方式发现服务提供端
+@EnableCircuitBreaker  // Netflix Hystrix 熔断器
+@EnableFeignClients(clients = IUserService.class) // 申明 UserService 接口作为 Feign Client 调用
+public class UserServiceClientApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(UserServiceClientApplication.class, args);
+    }
+
+    /**
+     * @description 获取用以负载均衡的RestTemplate的Bean对象,
+     *          注释@LoadBalanced将会把RestTemplate也注册为 LoadBalancerClient,
+     *          所以如果自动注入LoadBalancerClient对象也是本方法返回对象
+     *          而且使用该RestTemplate.execute调用的也是LoadBalancerClient#execute
+     * @author zhangxinxin
+     * @date 2019/1/10 14:43
+     * @return org.springframework.web.client.RestTemplate
+     **/
+    @Bean(name = "loadBalanceRestTemplate")
+    @LoadBalanced
+    public RestTemplate getLoadBalanceRestTemplate() {
+        return new RestTemplate();
+    }
+
+    // ...省略其他不相关内容
+}
+```
+
+<br />
+
+#### Controller调用用户服务API的接口
+
+```Java
+package com.sestar.userserviceclient.web.controller;
+
+import com.sestar.userapi.api.IUserService;
+import com.sestar.userapi.domain.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * @description Server Client Controller
+ * @author zhangxinxin
+ * @date 2019/2/15 21:30
+ **/
+@RestController
+public class UserServiceClientController {
+
+    /**
+     * 用户服务中心
+     **/
+    @SuppressWarnings("all")
+    @Autowired
+    private IUserService userServer;
+
+    @PostMapping("/user/save")
+    public boolean saveUser(@RequestBody User user) {
+        return userServer.saveUser(user);
+    }
+
+    @GetMapping("/user/find/all")
+    public List<User> findAll() {
+        return userServer.findAll();
+    }
+
+}
+```
+
+<br />
+
+### 搭建路由管理端
+
+<br />
+
+#### Maven依赖
+
+```xml
+<!-- Spring Cloud Netflix Zuul -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-zuul</artifactId>
+</dependency>
+
+<!-- Eureka Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+
+<!-- Config Client -->
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-config-client</artifactId>
+</dependency>
+```
+
+<br />
+
+#### application.properties
+
+```properties
+## 应用服务
+server.port = 3731
+
+## Actuator
+### 主要是 zuul.RouteEndPoint(/routes) 安全权限打开
+management.security.enabled = false
+```
+
+<br />
+
+#### bootstrap.properties
+
+```properties
+## 应用名称
+spring.application.name = zuul-proxy-application
+
+##  Eureka
+### spring-eureka-server-application注册到 Eureka 服务器中
+### ${}都为服务器的配置内容 http://服务器地址:${server.port}/${server.context-path}/eureka
+### 如果 bootstrap 有配置 spring.cloud.config.discovery.service-id, 则需要把该配置移到 bootstrap 中
+### 因为*.discovery.service-id属性是查找 Eureka 服务配置端, 而查找范围就是eureka.client.service-url.defaultZone
+### 需要最先加载 Eureka 注册信息, eureka.client.service-url.defaultZone才能确定范围,
+### 而 *.discovery.service-id属性配置在 bootstrap 中, 比 application 配置先加载,
+### 所以当有配置Eureka服务配置端, 则需要把 eureka.client.service-url.defaultZone必须配置在 bootstrap 中
+eureka.client.serviceUrl.defaultZone = http://127.0.0.1:3701/eureka
+
+## 配置客户端应用关联的应用
+## spring.cloud.config.name 是可选的
+## 如果没有配置，采用 ${spring.application.name}
+spring.cloud.config.name = zuul-config
+## 关联profile
+spring.cloud.config.profile = default
+## 关联label
+spring.cloud.config.label = master
+## 激活 Config Server 服务发现和 spring.cloud.config.discovery.serviceId 捆绑配置
+spring.cloud.config.discovery.enabled = true
+## Config Server 服务器应用名称
+spring.cloud.config.discovery.serviceId = config-server-application
+```
+
+<br />
+
+#### 启动类注册Zuul路由代理
+
+```java
+package com.sestar.zuulproxy;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
+
+/**
+ * @description Zuul 路由代理启动类
+ * @author zhangxinxin
+ * @date 2019/2/27 9:36
+ **/
+@EnableZuulProxy    // 注册Zuul路由代理
+@SpringBootApplication
+public class ZuulProxyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ZuulProxyApplication.class, args);
+    }
+
+}
+```
+
+<br />
+
+### 测试路由代理
+
+```text
+项目启动顺序:
+    1. eureka-server (用以Eureka服务发现, 必定第一个启动)
+    2. config-server (给 user-service-client, zuul-proxy 获取profile文件, 肯定需要比user-service-client,
+                      zuul-proxy项目先启动)
+    3. user-service-provider (eureka项目端, zuul-proxy项目也会将该项目注册路由, 所以肯定要比zuul-proxy先启动)
+    4. user-service-client (eureka项目端, zuul-proxy项目也会将该项目注册路由, 所以肯定要比zuul-proxy先启动)
+    5. zuul-proxy (需要把所有的eureka项目端都注册路由, 所以需要最后一个启动)
+
+开始测试路由代理:
+    1. 访问 http://127.0.0.1:3731/routes
+    2. 查看路由代理Map是否完整
+        {
+            /user-service-client/**: "user-service-client-application", # 静态路由, config-server的profile中获取
+            /user-service-provider/**: "user-service-provider-application", # 静态路由, config-server的profile中获取
+            /user-service-provider-application/**: "user-service-provider-application", # 动态路由, spring.application.name直接作为server-id
+            /config-server-application/**: "config-server-application", # 动态路由, spring.application.name直接作为server-id
+            /user-service-client-application/**: "user-service-client-application" # 动态路由, spring.application.name直接作为server-id
+        }
+    3. 访问静态路由: http://127.0.0.1:3731/user-service-provider/user/find/all, 访问成功代表静态路由注册成功
+    4. 访问静态路由: http://127.0.0.1:3731/user-service-client-application/user/find/all, 访问成功代表动态路由注册成功
+```
+
+<br />
+
+## 消息驱动(Kafka)
+
+[参考源码](https://github.com/Sestar/firstLearn/tree/master/spring-cloud/cloud-multiple)
+
+<br />
+
+### ReadMeFirst
+
+```text
+源码是spring boot多个功能的集合, 本节主要介绍Zuul
+
+Module:
+    eureka-server(Eureka服务注册端), config-server(服务配置端),
+    user-api(用户服务API), user-service-provider(服务提供端),
+    user-service-client(客户端), zuul-proxy(路由管理端).
+
+user-service-provider(服务提供端):
+    application.properties开启Eureka
+    启动类激活@EnableHystrix, @EnableDiscoveryClient
+    使用Hystrix的方式是在服务添加HystrixCommand, 增加超时熔断, 自定义回滚方法
+
+user-service-client(客户端):
+    application.properties开启Eureka
+    启动类激活@RibbonClient, @EnableDiscoveryClient, @EnabelFeignClients
+    关闭ribbon.listOfServers, Feign和Service-provider(config-server的profile中获取)
+
+zuul-proxy(路由管理端):
+    application.properties开启Eureka
+    启动类激活@EnableZuulProxy
+    关闭ribbon.listOfServers, zuul.routes(config-server的profile中获取)
+```
+
+<br />
+
+### 结构图
+
+<img width="30%" src="/note/_v_images/java/框架/SpringCloud/Zuul-1.png">
+
+<br />

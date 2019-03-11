@@ -90,7 +90,7 @@ git remote set-url origin 远程地址
 ## 生成ssh文件
 
 ```text
-Git Base 运行 $ ssh -keygen -t rsa -C "346825377@qq.com"
+Git Base 运行 $ ssh-keygen -t rsa -C "346825377@qq.com"
 之后会让你输入三个密码, 全部填空即可
 在 C:\Users\Sestar\.ssh 文件夹下会生成 id_rsa 和 id_rsa.pub 文件
 在 Git Hub 的个人 ssh 设置中, title自定义, key填写id_rsa.pub的内容即可
