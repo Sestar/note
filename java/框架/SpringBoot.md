@@ -163,15 +163,80 @@ public ConfigurableApplicationContext run(String... args) {
 
 <img width="100%" src="/note/_v_images/java/框架/SpringBoot/PropertySourceLoader.png" />
 
-ConfigFileApplicationListener.java负责读取配置文件以及profile，该类有内置Loader私有类, 这个私有类负责读取文件内容。  
-Loader私有类属性有PropertiesLoader实例对象, PropertyLoader有loaders数组(PropertyLoader接口实现对象),   
-&emsp;PropertyLoader接口有两个实现类:  
-&emsp;&emsp;1. PropertiesPropertySourcesLoader(负责读取properties和xml文件),  
-&emsp;&emsp;2. YamlPropertySourcesLoader(负责读取yaml和yml文件)
+```text
+ConfigFileApplicationListener.java负责读取配置文件以及profile，该类有内置Loader私有类, 这个私有类负责读取文件内容。
+Loader私有类属性有PropertiesLoader实例对象, PropertyLoader有loaders数组(PropertyLoader接口实现对象),
+PropertyLoader接口有两个实现类:
+    1. PropertiesPropertySourcesLoader(负责读取properties和xml文件),
+    2. YamlPropertySourcesLoader(负责读取yaml和yml文件)
+```
 
 </br>
+
+## Spring Web MediaType
+
+<br />
+
+### HttpMessageConverter
+
+```text
+HttpMessageConverter: 处理Request和Response的数据格式
+
+启动 Spring Boot, 加载 HttpMessageConverter 将会加载 HttpMessageConvertersAutoConfiguration 配置类
+HttpMessageConvertersAutoConfiguration > JacksonHttpMessageConvertersConfiguration > JacksonHttpMessageConvertersConfiguration
+
+一般 Spring Boot 项目只有三种 HttpMessageConverter 配置类:
+1. HttpMessageConvertersAutoConfiguration
+2. HypermediaHttpMessageConverterConfiguration -> application/octet-stream
+3. StringHttpMessageConverterConfiguration -> text/plain
+
+如果有依赖 jackson-databind(spring-boot-starter-web 都会引用), 将会增加一个 HttpMessageConverter 配置类:
+MappingJackson2HttpMessageConverterConfiguration -> application/json
+
+如果不仅有 jackson-databing, 还有 jackson-dataformat-xml, 还会再增加一个 HttpMessageConverter 配置类:
+MappingJackson2XmlHttpMessageConverterConfiguration -> application/xml
+```
+
+<br />
+
+### ResponseBody
+
+```text
+@ResponseBody 注释将会解析返回内容
+
+Spring Boot Starter Web 支持的是将返回内容封装成 ModelAndView:
+
+源码定位: AnnotationMethodHandlerAdapter$ServletHandlerMethodInvoker#getModelAndView
+将会判断 返回值是否是 HttpEntity 数据, 这种数据对象一般是使用 Template 代理获取服务数据, 和本节内容无关不考虑
+然后会判断请求的接口方法 handlerMethod 是否有 @ResponseBody 注释。
+有 @ResponseBody 注释则会根据 returnValue 的类型确定 HttpMessageConverter：
+    String -> StringHttpMessageConverter
+    Object -> org.springframework.boot.autoconfigure.web.JacksonHttpMessageConvertersConfiguration(配置)
+        MappingJackson2HttpMessageConverter(Object -> json)
+        MappingJackson2XmlHttpMessageConverterConfiguration(Object -> json)
+
+Object 转换对象类型判断:
+
+    1. 仅依赖 jackson-databind, jackson-databind-2.8.10.jar!\META-INF\services\com.fasterxml.jackson.core.ObjectCodec
+    默认会加载 ObjectMapper. 通过 JacksonHttpMessageConvertersConfiguration 配置类可以看出会自动加载
+    MappingJackson2HttpMessageConverterConfiguration 配置, 即项目会增加 MappingJackson2HttpMessageConverter 这个 HttpMessageConverter.
+    则 @ResponseBody 默认返回的是 MappingJackson2HttpMessageConverter 的转化内容, 而这个转化是将 Object -> json
+
+    2. 但是还有依赖 jackson-dataformat-xml, jackson-dataformat-xml-2.8.10.jar!\META-INF\services\com.fasterxml.jackson.core.ObjectCodec
+    也会默认加载 XmlMapper. 通过 JacksonHttpMessageConvertersConfiguration 配置类可以看出会自动加载
+    MappingJackson2XmlHttpMessageConverterConfiguration 配置,即项目会增加 MappingJackson2XmlHttpMessageConverter 这个 HttpMessageConverter
+    则此时既有 MappingJackson2HttpMessageConverter, 也有 MappingJackson2XmlHttpMessageConverter.
+    那么又怎么确定返回什么类型的数据呢？是 Json 还是 Xml 呢?
+
+    2.1 AnnotationMethodHandlerAdapter$ServletHandlerMethodInvoker#getModelAndView 处理 @ResponseBody 时会先处理 Accept(返回数据格式),
+      AnnotationMethodHandlerAdapter$ServletHandlerMethodInvoker#writeWithMessageConverters 会对接收格式进行排序(
+      MimeType$SpecificityComparator), 对所有的HttpMessageConverters 按顺序判断是否符合要求. 而 xml 格式的优先级比 json 高, 所以如果这两种都
+      支持的情况下, 会优先转化为 application/xml
+    2.2 @RequestMapping 指定返回的 MediaType(数据格式): (@RequestMapping(value = "/*", produces = MediaType.APPLICATION_XML_VALUE))
+```
+
+<br />
 
 ## 随笔
 
 * Application启动类的args是SpringBoot的配置内容(IDEA的Edit Configuration...), 比如: vm options, program arguments
-</br>

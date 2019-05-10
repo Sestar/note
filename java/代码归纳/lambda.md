@@ -1,6 +1,6 @@
 # lambda
 
-## 跟据某个属性分组OfficeId
+## 根据某个属性分组OfficeId
 
 ```java
 Map<String, List<IncomeSumPojo>> collect =

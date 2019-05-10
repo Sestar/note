@@ -64,3 +64,31 @@ switch virtual window |   Win + Tab
 
 > cmd管理员运行
 > taskkill /f /t /im "app.exe" (比如: taskkill /f /t /im "cmd.exe", 强制终止 cmd.exe 程序, 一般终止保护程序)
+
+<br />
+
+## 浏览器总是会打开 hao123 网页
+
+```text
+1. 打开 Internet 设置 -> 启动 -> 选择: 从上次会话中的标签页开始
+
+2. 打开 Google 属性 -> 快捷方式 -> 目标 -> 只留下 Google 的安装目录地址
+
+3. 如果还是不行, 打开编辑器 (cmd -> regedit), 删除 Internet Explorer 注册表内容
+    1. HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Internet Explorer
+    2. HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Internet Explorer
+```
+
+<br />
+
+<img width="35%" height="500px" src="/note/_v_images/sofa/Win10/网页主页设置-1.png">
+
+<img width="35%" height="500px" src="/note/_v_images/sofa/Win10/网页主页设置-2.png">
+
+<br />
+
+## 防蓝光
+
+```
+任务栏设置(任务栏右键) -> 主页 -> 系统 -> 显示 -> 夜间模式 -> 调节色温 和 开启时间
+```

@@ -384,14 +384,14 @@ Edit Configurations -> 修改项目 -> 右上角Single instance Only勾选去除
 </br></br>
 
 
-* <span style="color:orange">IDEA   添加单元测试覆盖率</span>  
-  配置启动项: Edit Configurations...  
-  
-  <img src="/note/_v_images/sofa/IDEA/单元测试覆盖率-1.png" width="70%"/>  
-  
+* <span style="color:orange">IDEA   添加单元测试覆盖率</span>
+  配置启动项: Edit Configurations...
+
+  <img src="/note/_v_images/code_sofa/IDEA/单元测试覆盖率-1.png" width="70%"/>
+
   覆盖率是检测运行期间是否所有分支都有执行, 包括异常抛出的分支, 在Repeat可以选择多次, 能让覆盖率报告更加精确, 毕竟执行一次只会执行一个分支。
-  
-  <img src="/note/_v_images/sofa/IDEA/单元测试覆盖率-2.png" width="50%"/>  
-  
+
+  <img src="/note/_v_images/code_sofa/IDEA/单元测试覆盖率-2.png" width="50%"/>
+
   选择不同的范围生成不同测试覆盖报告, 显示覆盖报告点击右键-> Run With Coverage或者Edit Configurations旁边的Run With Coverage
   需要测试覆盖报告文件，在Coverage窗口点击Genergate Coverage Report(左上角红线)即可, Coverage窗口(右下角红线)
