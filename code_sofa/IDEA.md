@@ -138,7 +138,7 @@ Ctrl + 右方向键 | 光标跳转到当前单词 / 中文句的右侧开头位�
 Ctrl + 前方向键 | 等效于鼠标滚轮向前效果 （必备）
 Ctrl + 后方向键 | 等效于鼠标滚轮向后效果 （必备）
 
-</br>
+<br />
 
 ### Alt
 
@@ -288,31 +288,50 @@ ESC | 从工具窗口进入代码文件窗口 （必备）
 
 ## 插件
 
-</br>
+<br />
 
 ### 添加插件
 
-</br>
+<br />
 
 #### IDEA客户端直接添加
 * Setting -> Plugins -> Browse repositories -> 输入插件名搜索 -> Install -> Restart IDEA
-<img src="/note/_v_images/sofa/IDEA/添加插件.png" width="80%" />
 
-</br>
+<img width="30%" src="/note/_v_images/code_sofa/IDEA/添加插件.png" width="80%" />
+
+<br />
 
 #### 网页直接下载插件
 
 * 官方插件网站: http://plugins.jetbrains.com/idea
 * 下载后的插件放在IDEA的根目录的plugins下，重启即可
-</br></br>
+
+<br /><br />
 
 ### 隐藏文件插件(.ignore)
 
-<img src="/note/_v_images/sofa/IDEA/ignore插件使用指南.png" height="600px" />
-</br></br>
+```text
+File -> Setting -> Plugins -> Browse repositiories... -> .ignore
+```
+
+<img width="30%" height="50%" src="/note/_v_images/code_sofa/IDEA/ignore插件使用指南.png" height="600px" />
+
+<br />
+
+
+### MyBatis 的 Xml 文件映射到接口文件
+
+```text
+File -> Setting -> Plugins -> Browse repositiories... -> Free MyBatis Plugin
+```
+
+<img width="30%" src="/note/_v_images/code_sofa/IDEA/IDEA-Plugin-FreeMyBatis-1.png" />
+
+<br /><br />
 
 ## 方法注释
-</br>
+
+<br />
 
 ### 方法注释模板
 
@@ -325,7 +344,7 @@ ESC | 从工具窗口进入代码文件窗口 （必备）
  * @return $return$
  **/
 ```
-</br>
+<br />
 
 ### 注释方法 入参param
 
@@ -348,7 +367,7 @@ ESC | 从工具窗口进入代码文件窗口 （必备）
 ```
 groovyScript("def result=''; def params=\"${_1}\".replaceAll('[\\\\[|\\\\]|\\\\s]', '').split(',').toList(); for(i = 0; i < params.size(); i++) {if(params[i] == '') return result; if(i==0) { result += '* @param ' + params[i] + ((i < params.size() - 1) ? ' \\n' : ' ') } else {result+=' * @param ' + params[i] + ((i < params.size() - 1) ? ' \\n' : ' ')}}; return result", methodParameters())
 ```
-</br>
+<br />
 
 ## Application 多次启动
 
@@ -381,7 +400,7 @@ Edit Configurations -> 修改项目 -> 右上角Single instance Only勾选去除
 ## 随笔
 
 * <span style="color:orange">background task 自动弹出</span>  window->Background Task->Auto show
-</br></br>
+<br /><br />
 
 
 * <span style="color:orange">IDEA   添加单元测试覆盖率</span>
